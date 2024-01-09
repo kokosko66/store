@@ -1,6 +1,7 @@
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.desktop.QuitEvent;
 import java.awt.event.*;
 import java.io.IOException;
 import java.util.*;
@@ -91,6 +92,9 @@ public class Main {
                                         purchase.setBounds(400, 0, 100, 100);
                                         f.add(purchase);
 
+                                        JButton finishTransaction = new JButton("Pay");
+
+
                                         MouseListener mouseListener = new MouseAdapter() {
                                             @Override
                                             public void mouseClicked(MouseEvent e) {
@@ -109,9 +113,25 @@ public class Main {
                                                     paymentPanel.add(values);
                                                 }
 
+                                                finishTransaction.setSize(100, 50);
+
+                                                MouseListener finishListener = new MouseAdapter() {
+                                                    @Override
+                                                    public void mouseClicked(MouseEvent e) {
+                                                        f.dispose();
+                                                        subFrame.dispose();
+                                                    }
+                                                };
+
+                                                finishTransaction.addMouseListener(finishListener);
+                                                paymentPanel.add(finishTransaction);
                                                 subFrame.add(paymentPanel);
                                             }
+
+
                                         };
+
+
 
                                         purchase.addMouseListener(mouseListener);
 
@@ -124,8 +144,6 @@ public class Main {
                 } catch (UnsupportedFlavorException | IOException ex) {
                     ex.printStackTrace();
                 }
-
-
 
                 return true;
             }
