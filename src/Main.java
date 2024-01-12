@@ -3,24 +3,25 @@ import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.desktop.QuitEvent;
 import java.awt.event.*;
+import java.io.File;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.Timer;
 import javax.swing.*;
 
-
 class Price extends JButton {
-
     double price;
-
     public Price(String text, double newPrice) {
         super(text);
         this.price = newPrice;
     }
-
 }
-public class Main {
 
+public class Main {
     static void Window() {
         //Create window
         JFrame f = new JFrame();
@@ -61,10 +62,8 @@ public class Main {
             Price product = getPrice(products, i);
             f.add(product);
         }
-
         final double[] finalPrice = {0};
         final var allProducts = new ArrayList<Price>();
-
         dropPanel.setTransferHandler(new TransferHandler() {
             public boolean canImport(TransferHandler.TransferSupport support) {
                 return true;
@@ -93,8 +92,6 @@ public class Main {
                                         f.add(purchase);
 
                                         JButton finishTransaction = new JButton("Pay");
-
-
                                         MouseListener mouseListener = new MouseAdapter() {
                                             @Override
                                             public void mouseClicked(MouseEvent e) {
@@ -112,29 +109,59 @@ public class Main {
                                                 for (Price values : finalArrayList) {
                                                     paymentPanel.add(values);
                                                 }
-
                                                 finishTransaction.setSize(100, 50);
-
                                                 MouseListener finishListener = new MouseAdapter() {
                                                     @Override
                                                     public void mouseClicked(MouseEvent e) {
+
+                                                        JFrame frame = new JFrame("Payment");
+                                                        frame.setSize(400, 300);
+
+                                                        frame.setLayout(new FlowLayout());
+
+                                                        JLabel nameLabel = new JLabel("Name:");
+                                                        JTextField nameTextField = new JTextField(20);
+                                                        frame.add(nameLabel);
+                                                        frame.add(nameTextField);
+
+                                                        JLabel cardLabel = new JLabel("Card Number:");
+                                                        JTextField cardTextField = new JTextField(20);
+                                                        frame.add(cardLabel);
+                                                        frame.add(cardTextField);
+
+                                                        JButton submitButton = new JButton("Submit");
+                                                        frame.add(submitButton);
+                                                        submitButton.addActionListener(new ActionListener() {
+                                                            @Override
+                                                            public void actionPerformed(ActionEvent e) {
+                                                                String sql = "INSERT INTO card(name, card_number) VALUES(?, ?)";
+                                                                try (Connection conn = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/store", "root", "password");
+                                                                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                                                                    pstmt.setString(1, nameTextField.getText());
+                                                                    pstmt.setString(2, cardTextField.getText());
+
+                                                                    int affectedRows = pstmt.executeUpdate();
+                                                                    System.out.println("Inserted rows: " + affectedRows);
+                                                                } catch (SQLException exception) {
+                                                                    exception.printStackTrace();
+                                                                } catch (NumberFormatException nfe) {
+                                                                    System.out.println("Invalid input for card");
+                                                                }
+                                                                frame.dispose();
+                                                            }
+                                                        });
                                                         f.dispose();
                                                         subFrame.dispose();
+                                                        frame.setVisible(true);
                                                     }
                                                 };
-
                                                 finishTransaction.addMouseListener(finishListener);
                                                 paymentPanel.add(finishTransaction);
                                                 subFrame.add(paymentPanel);
                                             }
-
-
                                         };
-
-
-
                                         purchase.addMouseListener(mouseListener);
-
                                     });
                                 }
                             }, 1500);
@@ -144,18 +171,15 @@ public class Main {
                 } catch (UnsupportedFlavorException | IOException ex) {
                     ex.printStackTrace();
                 }
-
                 return true;
             }
         });
-
         //Operations for window
         f.setLayout(null);
         f.setLocationRelativeTo(null);
         f.setVisible(true);
         dropPanel.setLayout(null);
     }
-
     private static Price getPrice(Price[] products, int i) {
         Price product = products[i];
         product.setBounds(0, 50 + (i * 50), 100, 50);
@@ -172,8 +196,6 @@ public class Main {
         });
         return product;
     }
-
-
     public static void main(String[] args) {
         SwingUtilities.invokeLater(Main::Window);
     }
