@@ -7,6 +7,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Main {
 
@@ -24,7 +26,7 @@ public class Main {
 
         @Override
         protected void exportDone(JComponent source, Transferable data, int action) {
-            // Не ни е нужно нищо, защото не ни трябва да export-ваме
+            // Не ни е нужно нищо, защото не ни е нужно да export-ваме
         }
     }
 
@@ -34,9 +36,10 @@ public class Main {
     private static final int PRODUCT_BUTTON_WIDTH = 150;
     private static final int PRODUCT_BUTTON_HEIGHT = 50;
 
-    private JFrame mainFrame;
+    private JFrame  mainFrame;
     private JPanel basketPanel;
     private double totalPrice = 0.0;
+    private Map<String, Integer> productQuantities = new HashMap<>();
 
     private JButton payButton;
 
@@ -52,7 +55,6 @@ public class Main {
 
         mainFrame.setLocationRelativeTo(null);
         mainFrame.setVisible(true);
-
     }
     private void createProductPanel() {
         JPanel productPanel = new JPanel();
@@ -86,8 +88,6 @@ public class Main {
         basketPanel.setBorder(BorderFactory.createTitledBorder("Basket"));
         basketPanel.setLayout(new BoxLayout(basketPanel, BoxLayout.Y_AXIS));
 
-        // Allow the basket to accept dropped buttons
-
         JLabel priceLabel = new JLabel("Total Price: 0.0lv", SwingConstants.CENTER);
         priceLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         basketPanel.add(priceLabel);
@@ -101,17 +101,26 @@ public class Main {
             @Override
             public boolean importData(TransferSupport support) {
                 try {
-                    String
-                            data = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                    String data = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
                     String[] parts = data.split(": ");
                     String productName = parts[0];
                     double productPrice = Double.parseDouble(parts[1].replace("lv", "").trim());
 
-                    totalPrice += productPrice; // Add product price to total
+                    productQuantities.put(productName, productQuantities.getOrDefault(productName, 0) + 1);
+
+                    basketPanel.removeAll();
+                    totalPrice = 0.0;
+                    for (Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
+                        String name = entry.getKey();
+                        int quantity = entry.getValue();
+                        totalPrice += quantity * productPrice;
+
+                        JLabel productLabel = new JLabel(quantity + "x" + name + ": " + String.format("%.2flv", quantity * productPrice));
+                        basketPanel.add(productLabel);
+                    }
+
                     priceLabel.setText("Total Price: " + String.format("%.2flv", totalPrice));
 
-                    JLabel productLabel = new JLabel(data);
-                    basketPanel.add(productLabel);
                     basketPanel.revalidate();
                     basketPanel.repaint();
                     return true;
@@ -173,7 +182,6 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -181,5 +189,4 @@ public class Main {
             }
         });
     }
-
 }
