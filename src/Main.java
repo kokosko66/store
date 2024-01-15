@@ -1,202 +1,185 @@
+import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.UnsupportedFlavorException;
-import java.awt.desktop.QuitEvent;
-import java.awt.event.*;
-import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.Timer;
-import javax.swing.*;
-
-class Price extends JButton {
-    double price;
-    public Price(String text, double newPrice) {
-        super(text);
-        this.price = newPrice;
-    }
-}
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 public class Main {
-    static void Window() {
-        //Create window
-        JFrame f = new JFrame();
 
-        f.setSize(800, 600);
-        f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-
-
-        JPanel dropPanel = new JPanel();
-        dropPanel.setBounds(250, 0, 100, 100);
-        dropPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-        dropPanel.setLayout(new BoxLayout(dropPanel, BoxLayout.Y_AXIS));
-        dropPanel.setTransferHandler(new TransferHandler("text"));
-        dropPanel.setName("Basket");
-        JLabel label = new JLabel("<html>Basket</html>");
-
-        JLabel priceLabel = new JLabel("<html><center>Price: </center></html>");
-        priceLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        dropPanel.add(label);
-        dropPanel.add(priceLabel);
-        f.add(dropPanel);
-
-        Price[] products = new Price[] {
-                new Price("Waffle: 2lv", 2),
-                new Price("Cheese: 5.6lv", 5.6),
-                new Price("Meat: 12lv", 12),
-                new Price("Biscuits: 2.5lv", 2.5),
-                new Price("Bread: 2lv", 2),
-        };
-
-        products[0].setBounds(0, 50, 100, 50);
-        products[1].setBounds(0, 100, 100, 50);
-        products[2].setBounds(0, 150, 100, 50);
-        products[3].setBounds(0, 200, 100, 50);
-        products[4].setBounds(0, 250, 100, 50);
-
-        for(int i = 0; i < products.length; i++) {
-            Price product = getPrice(products, i);
-            f.add(product);
+    private static class ButtonTransferHandler extends TransferHandler {
+        @Override
+        public int getSourceActions(JComponent c) {
+            return COPY;
         }
-        final double[] finalPrice = {0};
-        final var allProducts = new ArrayList<Price>();
-        dropPanel.setTransferHandler(new TransferHandler() {
-            public boolean canImport(TransferHandler.TransferSupport support) {
-                return true;
+
+        @Override
+        protected Transferable createTransferable(JComponent c) {
+            JButton button = (JButton) c;
+            return new StringSelection(button.getText());
+        }
+
+        @Override
+        protected void exportDone(JComponent source, Transferable data, int action) {
+            // Не ни е нужно нищо, защото не ни трябва да export-ваме
+        }
+    }
+
+
+    private static final int WINDOW_WIDTH = 800;
+    private static final int WINDOW_HEIGHT = 600;
+    private static final int PRODUCT_BUTTON_WIDTH = 150;
+    private static final int PRODUCT_BUTTON_HEIGHT = 50;
+
+    private JFrame mainFrame;
+    private JPanel basketPanel;
+    private double totalPrice = 0.0;
+
+    private JButton payButton;
+
+    public Main() {
+        mainFrame = new JFrame("Drag and Drop Products");
+        mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        mainFrame.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+        mainFrame.setLayout(new BorderLayout());
+
+        createProductPanel();
+        createBasketPanel();
+        createPayButton();
+
+        mainFrame.setLocationRelativeTo(null);
+        mainFrame.setVisible(true);
+
+    }
+    private void createProductPanel() {
+        JPanel productPanel = new JPanel();
+        productPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+
+        String[] products = {"Waffle", "Cheese", "Meat", "Biscuits", "Bread"};
+        for (String product : products) {
+            JButton productButton = new JButton(product + ": 2lv");
+            productButton.setPreferredSize(new Dimension(PRODUCT_BUTTON_WIDTH, PRODUCT_BUTTON_HEIGHT));
+
+            productButton.setTransferHandler(new ButtonTransferHandler());
+
+            productButton.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    JButton button = (JButton) e.getSource();
+                    TransferHandler handle = button.getTransferHandler();
+                    handle.exportAsDrag(button, e, TransferHandler.COPY);
+                }
+            });
+
+            productPanel.add(productButton);
+        }
+
+        mainFrame.add(productPanel, BorderLayout.NORTH);
+    }
+
+    private void createBasketPanel() {
+        basketPanel = new JPanel();
+        basketPanel.setPreferredSize(new Dimension(200, WINDOW_HEIGHT));
+        basketPanel.setBorder(BorderFactory.createTitledBorder("Basket"));
+        basketPanel.setLayout(new BoxLayout(basketPanel, BoxLayout.Y_AXIS));
+
+        // Allow the basket to accept dropped buttons
+
+        JLabel priceLabel = new JLabel("Total Price: 0.0lv", SwingConstants.CENTER);
+        priceLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        basketPanel.add(priceLabel);
+
+        basketPanel.setTransferHandler(new TransferHandler() {
+            @Override
+            public boolean canImport(TransferSupport support) {
+                return support.isDataFlavorSupported(DataFlavor.stringFlavor);
             }
 
-            public boolean importData(TransferHandler.TransferSupport support) {
+            @Override
+            public boolean importData(TransferSupport support) {
                 try {
-                    String data = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                    String
+                            data = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                    String[] parts = data.split(": ");
+                    String productName = parts[0];
+                    double productPrice = Double.parseDouble(parts[1].replace("lv", "").trim());
 
-                    for (Price product : products) {
-                        if (product.getText().equals(data)) {
-                            product.setVisible(false);
-                            label.setText(product.getText());
-                            Timer timer = new Timer();
-                            timer.schedule(new TimerTask() {
-                                @Override
-                                public void run() {
-                                    SwingUtilities.invokeLater(() -> {
-                                        product.setVisible(true);
-                                        label.setText("Basket");
-                                        finalPrice[0] += product.price;
-                                        allProducts.add(product);
-                                        priceLabel.setText("<html><center>Price " + finalPrice[0] + "lv</center></html>");
-                                        JButton purchase = new JButton("Purchase");
-                                        purchase.setBounds(400, 0, 100, 100);
-                                        f.add(purchase);
+                    totalPrice += productPrice; // Add product price to total
+                    priceLabel.setText("Total Price: " + String.format("%.2flv", totalPrice));
 
-                                        JButton finishTransaction = new JButton("Pay");
-                                        MouseListener mouseListener = new MouseAdapter() {
-                                            @Override
-                                            public void mouseClicked(MouseEvent e) {
-                                                JFrame subFrame = new JFrame();
-
-                                                JPanel paymentPanel = new JPanel();
-
-                                                paymentPanel.setSize(300, 550);
-
-                                                subFrame.setSize(350, 600);
-                                                subFrame.setVisible(true);
-
-                                                var finalArrayList = new ArrayList<>(allProducts);
-
-                                                for (Price values : finalArrayList) {
-                                                    paymentPanel.add(values);
-                                                }
-                                                finishTransaction.setSize(100, 50);
-                                                MouseListener finishListener = new MouseAdapter() {
-                                                    @Override
-                                                    public void mouseClicked(MouseEvent e) {
-
-                                                        JFrame frame = new JFrame("Payment");
-                                                        frame.setSize(400, 300);
-
-                                                        frame.setLayout(new FlowLayout());
-
-                                                        JLabel nameLabel = new JLabel("Name:");
-                                                        JTextField nameTextField = new JTextField(20);
-                                                        frame.add(nameLabel);
-                                                        frame.add(nameTextField);
-
-                                                        JLabel cardLabel = new JLabel("Card Number:");
-                                                        JTextField cardTextField = new JTextField(20);
-                                                        frame.add(cardLabel);
-                                                        frame.add(cardTextField);
-
-                                                        JButton submitButton = new JButton("Submit");
-                                                        frame.add(submitButton);
-                                                        submitButton.addActionListener(new ActionListener() {
-                                                            @Override
-                                                            public void actionPerformed(ActionEvent e) {
-                                                                String sql = "INSERT INTO card(name, card_number) VALUES(?, ?)";
-                                                                try (Connection conn = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/store", "root", "password");
-                                                                     PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-                                                                    pstmt.setString(1, nameTextField.getText());
-                                                                    pstmt.setString(2, cardTextField.getText());
-
-                                                                    int affectedRows = pstmt.executeUpdate();
-                                                                    System.out.println("Inserted rows: " + affectedRows);
-                                                                } catch (SQLException exception) {
-                                                                    exception.printStackTrace();
-                                                                } catch (NumberFormatException nfe) {
-                                                                    System.out.println("Invalid input for card");
-                                                                }
-                                                                frame.dispose();
-                                                            }
-                                                        });
-                                                        f.dispose();
-                                                        subFrame.dispose();
-                                                        frame.setVisible(true);
-                                                    }
-                                                };
-                                                finishTransaction.addMouseListener(finishListener);
-                                                paymentPanel.add(finishTransaction);
-                                                subFrame.add(paymentPanel);
-                                            }
-                                        };
-                                        purchase.addMouseListener(mouseListener);
-                                    });
-                                }
-                            }, 1500);
-                            break;
-                        }
-                    }
-                } catch (UnsupportedFlavorException | IOException ex) {
+                    JLabel productLabel = new JLabel(data);
+                    basketPanel.add(productLabel);
+                    basketPanel.revalidate();
+                    basketPanel.repaint();
+                    return true;
+                } catch (Exception ex) {
                     ex.printStackTrace();
                 }
-                return true;
+                return false;
             }
-        });
-        //Operations for window
-        f.setLayout(null);
-        f.setLocationRelativeTo(null);
-        f.setVisible(true);
-        dropPanel.setLayout(null);
-    }
-    private static Price getPrice(Price[] products, int i) {
-        Price product = products[i];
-        product.setBounds(0, 50 + (i * 50), 100, 50);
-        product.setTransferHandler(new SimpleTransferHandler());
+                });
 
-        product.addMouseListener(new MouseAdapter() {
-            public void mousePressed(MouseEvent e) {
-                JButton button = (JButton) e.getSource();
-                TransferHandler handler = button.getTransferHandler();
-                if (handler != null) {
-                    handler.exportAsDrag(button, e, TransferHandler.COPY);
-                }
+        mainFrame.add(basketPanel, BorderLayout.EAST);
+    }
+
+    private void createPayButton() {
+        payButton = new JButton("Pay");
+        payButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JFrame paymentFrame = new JFrame("Payment Details");
+                paymentFrame.setSize(300, 200);
+                paymentFrame.setLayout(new GridLayout(3, 2, 10, 10));
+
+                JLabel nameLabel = new JLabel("Name:");
+                JTextField nameTextField = new JTextField();
+                paymentFrame.add(nameLabel);
+                paymentFrame.add(nameTextField);
+
+                JLabel cardLabel = new JLabel("Card Number:");
+                JTextField cardTextField = new JTextField();
+                paymentFrame.add(cardLabel);
+                paymentFrame.add(cardTextField);
+
+                JButton submitButton = new JButton("Submit");
+                submitButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        String name = nameTextField.getText();
+                        String cardNumber = cardTextField.getText();
+                        JOptionPane.showMessageDialog(paymentFrame, "Payment processed for " + name);
+                        paymentFrame.dispose();
+                    }
+                });
+                paymentFrame.add(new JLabel());
+                paymentFrame.add(submitButton);
+
+                paymentFrame.setLocationRelativeTo(mainFrame);
+                paymentFrame.setVisible(true);
             }
         });
-        return product;
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(payButton);
+        mainFrame.add(buttonPanel, BorderLayout.SOUTH);
     }
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(Main::Window);
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new Main();
+            }
+        });
     }
+
 }
